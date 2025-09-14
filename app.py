@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 FastHTML Todo App - Complete Integration Example
-Demonstrates fasthtml-auth integration with user management features
+Demonstrates fasthtml-auth integration with built-in admin interface
 """
 
 from fasthtml.common import *
@@ -14,7 +14,7 @@ from pathlib import Path
 from models import TodoDatabase, Todo
 from routes.public import register_public_routes
 from routes.todos import register_todo_routes  
-from routes.admin import register_admin_routes
+from routes.admin import register_todo_admin_routes
 
 # Configuration
 BASE_DIR = Path(__file__).parent
@@ -31,7 +31,7 @@ APP_CONFIG = {
 def create_app():
     """Create and configure the FastHTML application"""
     
-    # Initialize Authentication System
+    # Initialize Authentication System with built-in admin
     auth_config = {
         'allow_registration': True,
         'public_paths': [
@@ -63,17 +63,18 @@ def create_app():
         hdrs=Theme.blue.headers()  # MonsterUI Blue Theme
     )
     
-    # Register authentication routes (built-in)
-    print("🔧 Registering authentication routes...")
-    auth.register_routes(app, prefix="/auth")
+    # Register authentication routes with built-in admin interface
+    print("🔧 Registering authentication routes with built-in admin...")
+    auth.register_routes(app, prefix="/auth", include_admin=True)
     
     # Register application routes  
     print("🔧 Registering application routes...")
     register_public_routes(app)
     register_todo_routes(app, auth, todo_db)
-    register_admin_routes(app, auth, todo_db)
+    register_todo_admin_routes(app, auth, todo_db)  # Only todo-specific admin features
     
     print("✅ Application initialized successfully!")
+    print("📋 Built-in admin interface enabled at /auth/admin")
     return app, auth, todo_db
 
 # Module-level app variable for uvicorn
@@ -81,23 +82,28 @@ app, auth, todo_db = create_app()
 
 def main():
     """Main application entry point"""
-    print("🚀 Starting FastHTML Todo App with Authentication")
-    print("=" * 50)
+    print("🚀 Starting FastHTML Todo App with Built-in Authentication Admin")
+    print("=" * 60)
     
     try:
         
         print(f"""
-📍 Application ready!
+🌐 Application ready!
    • Login: http://localhost:{APP_CONFIG['port']}/auth/login
    • Register: http://localhost:{APP_CONFIG['port']}/auth/register  
-   • Home: http://localhost:{APP_CONFIG['port']}/
+   • Dashboard: http://localhost:{APP_CONFIG['port']}/dashboard
    
-🔐 Default Admin Account:
+🔧 Admin Interfaces:
+   • Built-in Admin: http://localhost:{APP_CONFIG['port']}/auth/admin
+   • User Management: http://localhost:{APP_CONFIG['port']}/auth/admin/users
+   • Todo Admin: http://localhost:{APP_CONFIG['port']}/admin/todos
+   
+🔑 Default Admin Account:
    • Username: admin
    • Password: admin123
    • Role: admin
    
-📝 Demo Users (created automatically):
+👥 Demo Users (created automatically):
    • Username: demo_user / Password: demo123 (role: user)
    • Username: demo_manager / Password: demo123 (role: manager)
         """)
@@ -124,13 +130,13 @@ def create_demo_data(auth, todo_db):
         for username, email, password, role in demo_users:
             if not auth.get_user(username):
                 user = auth.user_repo.create(username, email, password, role)
-                print(f"📝 Created demo user: {username} ({role})")
+                print(f"👤 Created demo user: {username} ({role})")
                 
                 # Add sample todos for demo users
                 if role == 'user':
                     sample_todos = [
                         "Learn FastHTML framework",
-                        "Integrate authentication system",
+                        "Integrate authentication system", 
                         "Build todo application",
                         "Deploy to production"
                     ]

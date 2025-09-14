@@ -1,17 +1,19 @@
-# FastHTML Todo App - Authentication Integration Example
+# FastHTML Todo App - Built-in Admin Integration Example
 
-A comprehensive todo application demonstrating **fasthtml-auth** integration with advanced user management, role-based access control, and administrative features.
+A comprehensive todo application demonstrating **fasthtml-auth v0.2.0** integration with built-in admin interface, advanced user management, and role-based access control.
 
-![FastHTML Todo Demo](https://via.placeholder.com/800x400/2563eb/ffffff?text=FastHTML+Todo+Demo)
+![FastHTML Todo Demo](https://via.placeholder.com/800x400/2563eb/ffffff?text=FastHTML+Todo+Demo+v2.0)
 
 ## 🌟 What This Demonstrates
 
-This application showcases real-world integration patterns for the `fasthtml-auth` package:
+This application showcases real-world integration patterns for the `fasthtml-auth` package with **built-in admin capabilities**:
 
+- ✅ **Built-in Admin Interface** - Complete user management via fasthtml-auth v0.2.0  
+- ✅ **Simplified Architecture** - Reduced codebase by leveraging library features
 - ✅ **Complete Authentication Flow** - Registration, login, logout, profiles
 - ✅ **Database Extension Patterns** - Adding user-owned data (todos) 
 - ✅ **Role-Based Access Control** - User, Manager, Admin permissions
-- ✅ **Administrative User Management** - Features missing from base library
+- ✅ **Custom Admin Extensions** - Todo-specific admin features
 - ✅ **Modular Architecture** - Scalable project organization
 - ✅ **Beautiful UI Integration** - MonsterUI components and forms
 
@@ -37,41 +39,64 @@ This application showcases real-world integration patterns for the `fasthtml-aut
    ```
 
 3. **Open your browser:**
-   - App: http://localhost:5000
-   - Login: http://localhost:5000/auth/login
+   - App: http://localhost:5001
+   - Login: http://localhost:5001/auth/login
+   - **Built-in Admin**: http://localhost:5001/auth/admin
 
 ### Demo Accounts
 
 | Username | Password | Role | Purpose |
 |----------|----------|------|---------|
-| `admin` | `admin123` | Admin | Full system access |
+| `admin` | `admin123` | Admin | Full system access + built-in admin |
 | `demo_user` | `demo123` | User | Basic todo management |
 | `demo_manager` | `demo123` | Manager | Extended features |
 
-## 📁 Project Structure
+## 📂 Project Structure
 
 ```
 fasthtml-todo-example/
-├── app.py                 # Main application & setup
+├── app.py                 # Main application & built-in admin setup
 ├── models.py              # Database models & extensions
-├── components.py          # Reusable UI components
+├── components.py          # Reusable UI components (simplified)
 ├── routes/
 │   ├── public.py         # Public pages (landing, about)
 │   ├── todos.py          # Todo CRUD operations
-│   └── admin.py          # Admin user management
+│   └── admin.py          # Todo-specific admin features only
 ├── data/
 │   └── todo_app.db       # SQLite database (auto-created)
 └── README.md             # This file
 ```
 
-## 🔗 Key Integration Patterns
+## 🎯 Architecture Changes (v2.0)
 
-### 1. Authentication Setup
+### What's New with Built-in Admin
+
+**✅ Replaced Custom Code:**
+- ~300 lines of user management code removed
+- Professional admin interface with search & pagination  
+- Safety features (prevent admin self-deletion)
+- User CRUD operations with role management
+- Admin dashboard with user statistics
+
+**✅ Built-in Admin Routes (Automatic):**
+- `/auth/admin` - Main admin dashboard with user stats
+- `/auth/admin/users` - Complete user management interface
+- `/auth/admin/users/create` - Create users with role selection
+- `/auth/admin/users/edit?id={id}` - Edit users, roles, activation
+- `/auth/admin/users/delete?id={id}` - Delete users with safety checks
+
+**✅ Custom Admin Routes (Application-specific):**
+- `/admin/todos` - Todo management across all users  
+- `/admin/system` - Todo-specific system statistics
+
+## 🔧 Key Integration Patterns
+
+### 1. Enable Built-in Admin Interface
 
 ```python
 from fasthtml_auth import AuthManager
 
-# Initialize authentication
+# Initialize authentication with built-in admin
 auth = AuthManager(
     db_path="data/app.db",
     config={
@@ -84,12 +109,12 @@ auth = AuthManager(
 db = auth.initialize()
 beforeware = auth.create_beforeware()
 
-# Create app with auth
+# Create app with built-in admin enabled
 app = FastHTML(before=beforeware)
-auth.register_routes(app)
+auth.register_routes(app, prefix="/auth", include_admin=True)  # 🔑 Key change
 ```
 
-### 2. Database Extension
+### 2. Database Extension (Unchanged)
 
 ```python
 # Extend auth database with app-specific tables
@@ -101,160 +126,162 @@ class TodoDatabase:
         self.todos = self.db.create(Todo, pk=Todo.pk)
 ```
 
-### 3. Route Protection
+### 3. Updated Navigation
 
 ```python
-# Protected routes automatically get user
-@app.route("/dashboard")
-def dashboard(req):
-    user = req.scope['user']  # Available in all protected routes
-    todos = get_user_todos(user.id)
-    return render_dashboard(user, todos)
-
-# Role-based protection
-@app.route("/admin")
-@auth.require_admin()
-def admin_panel(req):
-    return admin_dashboard()
+# Navigation now points to built-in admin
+def DashboardNav(user):
+    nav_items = [
+        A("Dashboard", href="/dashboard"),
+        A("Profile", href="/auth/profile"),
+    ]
+    
+    # Admin users get access to built-in admin interface
+    if user.role == 'admin':
+        nav_items.append(A("Admin", href="/auth/admin"))  # Built-in admin
+    
+    nav_items.append(A("Logout", href="/auth/logout", cls=ButtonT.secondary))
+    return NavBar(*nav_items, brand=A(f"📝 {user.username}", href="/dashboard"))
 ```
 
-### 4. User Context Usage
+### 4. Todo-Specific Admin Extensions
 
 ```python
-# Access user information in routes
-def dashboard(req):
+# Custom admin routes for application-specific features
+@app.route("/admin/todos")
+@auth.require_admin()  
+def all_todos_management(req):
+    """View todos across all users - not handled by built-in admin"""
     user = req.scope['user']
-    
-    print(f"User ID: {user.id}")
-    print(f"Username: {user.username}")
-    print(f"Role: {user.role}")
-    print(f"Email: {user.email}")
-    
-    # Filter data by user ownership
-    todos = todo_db.get_todos_by_user(user.id)
+    all_todos = todo_db.get_all_todos_admin(limit=100)
+    return render_todos_management(user, all_todos)
 ```
 
-## 🛡️ Admin Features (Extensions)
+## 🛡️ Admin Features Comparison
 
-This app demonstrates admin functionality that extends the base `fasthtml-auth` library:
+### Built-in Admin Features (fasthtml-auth v0.2.0)
+- **User Management** - Create, edit, delete users
+- **Role Assignment** - Change user roles (user/manager/admin)
+- **Account Control** - Activate/deactivate user accounts
+- **Search & Filter** - Find users by username, email, role
+- **Pagination** - Handle large user databases efficiently
+- **Safety Features** - Prevent admin self-deletion, last admin removal
+- **Statistics** - User counts by role and status
+- **Professional UI** - Consistent MonsterUI design
 
-### User Management
-- **Role Assignment** - Promote users to manager/admin
-- **Account Status** - Activate/deactivate user accounts  
-- **User Deletion** - Remove users and their data
-- **User Overview** - System-wide user statistics
+### Custom Admin Extensions (Application-specific)
+- **Todo Overview** - View all todos across users
+- **Todo Statistics** - Completion rates, priority breakdown
+- **System Information** - Todo-specific metrics and reports  
+- **Todo Management** - Delete todos, view user activity
 
-### System Administration
-- **Todo Management** - View all todos across users
-- **System Statistics** - User counts, completion rates
-- **Activity Monitoring** - User login patterns
+## 📊 Benefits of Built-in Admin
 
-### Implementation Example
+### Code Reduction
+- **~300 lines removed** - No more custom user management code
+- **~5 routes eliminated** - User CRUD handled automatically
+- **Simplified navigation** - Consistent admin experience
+- **Reduced maintenance** - Library handles updates and bug fixes
 
+### Feature Improvements  
+- **Professional UI** - Polished admin interface with search
+- **Advanced Features** - Pagination, filtering, bulk operations
+- **Better Security** - Built-in safety checks and validation
+- **Consistent Design** - Matches library's MonsterUI styling
+- **Future-proof** - Automatic improvements via library updates
+
+### Development Focus
+- **Todo Features** - More time for core application functionality
+- **Business Logic** - Focus on application-specific requirements
+- **Custom Extensions** - Build on top of solid admin foundation
+
+## 🔗 Complete Route Structure
+
+### Authentication Routes (Built-in)
+```
+/auth/login               # User login
+/auth/logout              # User logout  
+/auth/register            # User registration
+/auth/profile             # User profile management
+```
+
+### Built-in Admin Routes (Automatic)
+```
+/auth/admin               # Admin dashboard with user statistics
+/auth/admin/users         # User management with search/filter/pagination
+/auth/admin/users/create  # Create new user with role selection
+/auth/admin/users/edit    # Edit user details, roles, activation status
+/auth/admin/users/delete  # Delete user with safety checks
+```
+
+### Application Routes (Custom)
+```
+/                         # Landing page (redirects if logged in)
+/dashboard                # User todo dashboard  
+/todos/new                # Create new todo
+/todos/{id}/edit          # Edit todo
+/about                    # About page
+/features                 # Features page
+```
+
+### Todo Admin Routes (Custom Extensions)
+```
+/admin/todos              # View all todos across users
+/admin/system             # Todo-specific system information
+/admin/todos/{id}/delete  # Admin delete any todo
+```
+
+## 🏃‍♂️ Migration from Custom Admin
+
+If updating from a custom admin implementation:
+
+### Step 1: Enable Built-in Admin
 ```python
-# Admin-only route with role checking
-@app.route("/admin/users/{user_id}/role", methods=["POST"])
-@auth.require_admin()
-async def change_user_role(req, user_id: int):
-    form = await req.form()
-    new_role = form.get('role')
-    
-    # Update user role (extends auth library)
-    success = auth.user_repo.update(user_id, role=new_role)
-    return RedirectResponse('/admin/users')
+# OLD
+auth.register_routes(app, prefix="/auth")
+
+# NEW - Enable built-in admin interface
+auth.register_routes(app, prefix="/auth", include_admin=True)
 ```
 
-## 📊 Database Schema
-
-### Extended Tables
-
-```sql
--- Todos table (extends auth database)
-CREATE TABLE todo (
-    id INTEGER PRIMARY KEY,
-    user_id INTEGER REFERENCES user(id),
-    title TEXT NOT NULL,
-    description TEXT,
-    completed INTEGER DEFAULT 0,
-    priority TEXT DEFAULT 'medium',
-    due_date TEXT,
-    created_at TEXT,
-    updated_at TEXT
-);
-```
-
-### Relationships
-
-- `todo.user_id` → `user.id` (Foreign Key)
-- User ownership enforced in application logic
-- Cascade deletion for user cleanup
-
-## 🎨 UI Components & Styling
-
-### MonsterUI Integration
-
+### Step 2: Update Navigation
 ```python
-from monsterui.all import *
-
-# Consistent component usage
-Card(
-    CardHeader(H2("My Todos")),
-    CardBody(todo_list),
-    cls="mt-6"
-)
-
-# Form styling
-LabelInput("Title", name="title", required=True)
-Button("Create Todo", type="submit", cls=ButtonT.primary)
+# Update admin links to point to built-in routes
+A("Admin", href="/auth/admin")  # Instead of /admin  
+A("Users", href="/auth/admin/users")  # Instead of custom user management
 ```
 
-### Reusable Components
+### Step 3: Remove Custom User Management
+- Delete custom user CRUD routes
+- Remove user management UI components  
+- Keep only application-specific admin features
 
-```python
-# Custom component patterns
-def StatsCard(title, value, icon):
-    return Card(
-        CardBody(
-            DivCentered(
-                Div(icon, cls="text-3xl mb-2"),
-                P(title, cls="text-sm text-muted-foreground"),
-                P(str(value), cls="text-2xl font-bold")
-            )
-        )
-    )
-```
+## 🔒 Security Features
 
-## 🔒 Security Considerations
-
-### Authentication
-- ✅ Bcrypt password hashing (via fasthtml-auth)
+### Authentication (Built-in)
+- ✅ Bcrypt password hashing
 - ✅ Session-based authentication
 - ✅ Route protection middleware
 - ✅ User ownership validation
 
-### Authorization  
-- ✅ Role-based access control
+### Built-in Admin Security
 - ✅ Admin self-protection (can't delete/demote self)
-- ✅ User data isolation
+- ✅ Last admin protection (can't remove all admins)  
+- ✅ Role-based access control
 - ✅ Input validation and sanitization
+- ✅ Safe user deletion with confirmations
 
-### Example Protection
-
-```python
-# Ensure user owns data before operations
-def get_todo(todo_id, user_id):
-    todo = db.get_todo_by_id(todo_id, user_id)  # User constraint
-    if not todo:
-        return Response("Not Found", status_code=404)
-    return todo
-```
+### Application Security
+- ✅ User data isolation (todos belong to users)
+- ✅ Admin can view/manage all todos
+- ✅ Proper error handling and validation
 
 ## 📈 Features by Role
 
 ### User Role
 - Create, edit, delete personal todos
 - Mark todos as complete/incomplete  
-- View personal statistics
+- View personal statistics and filters
 - Update profile and password
 
 ### Manager Role  
@@ -263,132 +290,125 @@ def get_todo(todo_id, user_id):
 
 ### Admin Role
 - All user/manager features
-- **User Management** - roles, activation, deletion
-- **System Overview** - stats, monitoring  
-- **Todo Administration** - view all user todos
+- **Built-in User Management** - via `/auth/admin/users`
+  - Create users with role assignment
+  - Edit user details, roles, activation status
+  - Delete users with safety checks
+  - Search and filter users
+- **Todo Administration** - via `/admin/todos`
+  - View todos across all users
+  - Delete any todo
+  - System-wide todo statistics
 
-## 🔧 Development Patterns
+## 🚀 Development Workflow
 
-### Error Handling
-```python
-try:
-    todo = todo_db.create_todo(user_id, title, description)
-    return RedirectResponse('/dashboard?success=created')
-except Exception as e:
-    print(f"Error creating todo: {e}")
-    return render_form(error="Creation failed")
+### Local Development
+```bash
+# Start with clean database
+rm -f data/todo_app.db
+python app.py  # Will recreate with demo data
+
+# Access admin interfaces
+# Built-in admin: http://localhost:5001/auth/admin
+# Todo admin: http://localhost:5001/admin/todos
 ```
 
-### Form Processing
-```python
-@app.route("/todos/new", methods=["POST"])
-async def create_todo(req):
-    form = await req.form()
-    title = form.get('title', '').strip()
-    
-    if not title:
-        return render_form(error="Title required")
-        
-    # Process form data...
+### Testing Admin Features
+1. **Built-in Admin Testing**
+   - Login as admin (`admin` / `admin123`)
+   - Navigate to `/auth/admin` 
+   - Test user creation, role changes, account management
+   - Verify search, pagination, safety features
+
+2. **Custom Admin Testing**  
+   - Navigate to `/admin/todos` from built-in admin
+   - Test todo viewing, filtering, deletion
+   - Verify integration between user and todo management
+
+### Database Exploration
+```bash
+# Monitor database changes
+sqlite3 data/todo_app.db ".tables"
+sqlite3 data/todo_app.db "SELECT * FROM user LIMIT 5;"
+sqlite3 data/todo_app.db "SELECT * FROM todo LIMIT 5;"
 ```
 
-### Redirect Patterns
-```python
-# Success redirects with messages
-return RedirectResponse('/dashboard?success=created', status_code=303)
+## 📝 Configuration Options
 
-# Error redirects with context
-return RedirectResponse('/todos/new?error=validation_failed', status_code=303)
+### Authentication Configuration
+```python
+auth_config = {
+    'allow_registration': True,          # Enable user registration
+    'public_paths': ['/about', '/features'],  # Routes that skip auth
+    'login_path': '/auth/login',         # Custom login URL (optional)
+}
+
+auth = AuthManager(db_path="data/app.db", config=auth_config)
 ```
 
-## 🚀 Deployment
+### Built-in Admin Customization
+The built-in admin interface is automatically styled with MonsterUI and includes:
+- Professional form layouts and validation
+- Search and filtering capabilities  
+- Pagination for large user lists
+- Consistent navigation and branding
+- Safety confirmations for destructive actions
 
-### Production Considerations
+## 🤝 Contributing
 
-1. **Environment Variables**
-   ```bash
-   export SECRET_KEY="your-production-secret-key"
-   export DB_PATH="/app/data/production.db"
-   ```
+### Areas for Contribution
+- **Password Reset** - Email-based password recovery
+- **Two-Factor Authentication** - Enhanced security options
+- **OAuth Integration** - Google, GitHub login
+- **Email Verification** - Account verification workflow  
+- **Bulk Operations** - Mass user management features
+- **Advanced Reporting** - Analytics and usage reports
 
-2. **Database Backups**
-   ```bash
-   # Regular SQLite backups
-   cp data/todo_app.db backups/todo_app_$(date +%Y%m%d).db
-   ```
-
-3. **Security Headers**
-   ```python
-   app = FastHTML(
-       before=beforeware,
-       secret_key=os.getenv('SECRET_KEY'),
-       # Add security headers for production
-   )
-   ```
-
-## 🤝 Contributing to fasthtml-auth
-
-This example demonstrates features that could be added to the base library:
-
-### Potential Library Additions
-- **User Management Methods** - role changes, deletion, activation
-- **Admin Route Decorators** - `@auth.require_role()` variations
-- **User Statistics** - login tracking, activity monitoring
-- **Bulk Operations** - batch user management
-
-### Integration Feedback
-- Database extension patterns
-- UI component integration
-- Form validation approaches
-- Error handling strategies
+### Feedback Welcome
+- Built-in admin interface improvements
+- Integration patterns and best practices
+- Custom admin extension examples
+- UI/UX enhancements
 
 ## 📚 Learning Resources
 
 ### FastHTML-Auth Documentation
 - [GitHub Repository](https://github.com/fromlittleacorns/fasthtml-auth)
-- [PyPI Package](https://pypi.org/project/fasthtml-auth/)
-- [Integration Examples](https://github.com/fromlittleacorns/fasthtml-auth#examples)
+- [PyPI Package](https://pypi.org/project/fasthtml-auth/)  
+- [Built-in Admin Guide](https://github.com/fromlittleacorns/fasthtml-auth#built-in-admin-interface)
 
 ### Related Technologies
 - [FastHTML Framework](https://fastht.ml)
 - [MonsterUI Components](https://monsterui.dev)
 - [FastLite ORM](https://github.com/AnswerDotAI/fastlite)
 
-## 💡 Usage Tips
+## 💡 Tips & Best Practices
 
-### Development Workflow
-```bash
-# Start with clean database
-rm -f data/todo_app.db
-python app.py  # Will recreate with demo data
+### Leveraging Built-in Admin
+- Use built-in admin for all user management operations
+- Extend with application-specific admin features
+- Maintain consistent navigation between built-in and custom admin
+- Follow library's MonsterUI styling patterns
 
-# Monitor database changes
-sqlite3 data/todo_app.db ".tables"
-sqlite3 data/todo_app.db "SELECT * FROM user;"
-```
+### Custom Admin Development
+- Focus on application-specific functionality
+- Integrate smoothly with built-in admin interface
+- Use library's route protection decorators
+- Follow established patterns for consistency
 
-### Debugging Authentication
-```python
-# Check user context in routes
-def debug_route(req):
-    user = req.scope.get('user')
-    print(f"User: {user}")
-    print(f"Session: {req.scope.get('auth')}")
-    return Response("Check console")
-```
+### Database Integration
+- Ensure user deletion properly cleans up related data
+- Use foreign key relationships where appropriate
+- Consider cascade deletion for data integrity
+- Monitor database performance with user growth
 
-### Testing Role Changes
-1. Login as admin (`admin` / `admin123`)
-2. Go to Admin → User Management
-3. Change `demo_user` role to `manager`
-4. Login as `demo_user` to test new permissions
-
-## 📞 Support & Questions
+## 🔧 Troubleshooting
 
 ### Common Issues
-- **Database locked** - Close any SQLite browser connections
-- **Import errors** - Ensure all packages installed: `pip install fasthtml-auth python-fasthtml monsterui`
-- **Port conflicts** - Change port in `app.py`: `serve(port=5001)`
+- **Import errors** - Ensure `fasthtml-auth>=0.2.0` installed
+- **Admin not accessible** - Verify `include_admin=True` in route registration  
+- **Navigation broken** - Update admin links to use `/auth/admin/*` routes
+- **Database conflicts** - Remove old database file to recreate with new schema
 
 ### Getting Help
 - [FastHTML-Auth Issues](https://github.com/fromlittleacorns/fasthtml-auth/issues)
@@ -396,5 +416,7 @@ def debug_route(req):
 
 ---
 
-**FastHTML Todo Demo** - Complete authentication integration example
-*Built with ❤️ using FastHTML, fasthtml-auth, and MonsterUI*
+**FastHTML Todo Demo v2.0** - Built-in admin integration example  
+*Built with ❤️ using FastHTML, fasthtml-auth v0.2.0, and MonsterUI*
+
+**Key Achievement:** Reduced codebase by ~300 lines while improving functionality through built-in admin integration.

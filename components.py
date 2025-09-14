@@ -1,6 +1,7 @@
 """
 Reusable UI Components for FastHTML Todo App
 Demonstrates component patterns with MonsterUI integration
+User management components removed - now handled by fasthtml-auth built-in admin
 """
 
 from fasthtml.common import *
@@ -64,7 +65,7 @@ def DashboardNav(user):
     ]
     
     if user and user.role == 'admin':
-        nav_items.append(A("Admin", href="/admin"))
+        nav_items.append(A("Admin", href="/auth/admin"))  # Use built-in admin
     
     nav_items.append(A("Logout", href="/auth/logout", cls=ButtonT.secondary))
     
@@ -74,15 +75,15 @@ def DashboardNav(user):
     )
 
 def AdminNav(user):
-    """Navigation for admin panel"""
+    """Navigation for admin panel - points to built-in admin"""
     return NavBar(
         A("Dashboard", href="/dashboard"),
-        A("Users", href="/admin/users"),
-        A("Todos", href="/admin/todos"),
-        A("System", href="/admin/system"),
+        A("Users", href="/auth/admin/users"),    # Built-in user management
+        A("Todos", href="/admin/todos"),         # Custom todo admin
+        A("System", href="/admin/system"),       # Custom system info
         A("Profile", href="/auth/profile"),
         A("Logout", href="/auth/logout", cls=ButtonT.secondary),
-        brand=A("🔧 Admin Panel", href="/admin")
+        brand=A("🔧 Admin Panel", href="/auth/admin")  # Built-in admin dashboard
     )
 
 def StatsGrid(*stats_cards, cols=2, cols_md=4):

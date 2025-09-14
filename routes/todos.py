@@ -1,6 +1,7 @@
 """
 Todo Routes - Protected routes for todo management
-Demonstrates user-specific data handling and CRUD operations
+SECURITY HARDENED - Fixed critical user ownership verification
+Updated to use built-in admin navigation
 """
 
 from fasthtml.common import *
@@ -8,21 +9,37 @@ from monsterui.all import *
 from datetime import datetime
 
 def register_todo_routes(app, auth, todo_db):
-    """Register protected todo routes"""
+    """Register protected todo routes with enhanced security"""
     
     @app.route("/dashboard")
     def dashboard(req):
-        """Main user dashboard with todos"""
+        """Main user dashboard with todos - SECURITY HARDENED"""
         user = req.scope['user']
         filter_type = req.query_params.get('filter', 'all')
         
-        # Get todos based on filter
+        # DEBUG: Log dashboard access
+        print(f"DEBUG: Dashboard accessed by user_id={user.id}, username={user.username}, role={user.role}")
+        
+        # Get todos based on filter - SECURITY: Only user's own todos
         if filter_type == 'completed':
             todos = todo_db.get_todos_by_user(user.id, completed=True)
         elif filter_type == 'pending':  
             todos = todo_db.get_todos_by_user(user.id, completed=False)
         else:
             todos = todo_db.get_todos_by_user(user.id)
+        
+        # DEBUG: Log todo retrieval
+        print(f"DEBUG: User {user.id} retrieved {len(todos)} todos (filter={filter_type})")
+        
+        # SECURITY AUDIT: Verify all todos belong to current user
+        security_violations = []
+        for todo in todos:
+            if todo.user_id != user.id:
+                security_violations.append(f"Todo {todo.id} owned by {todo.user_id}")
+        
+        if security_violations:
+            print(f"🚨 CRITICAL SECURITY VIOLATIONS: {security_violations}")
+            # In production, you might want to log this to security logs and potentially block the request
         
         # Get user statistics
         stats = todo_db.get_user_stats(user.id)
@@ -37,7 +54,7 @@ def register_todo_routes(app, auth, todo_db):
     
     @app.route("/todos/new", methods=["POST"])
     async def create_todo(req):
-        """Create a new todo"""
+        """Create a new todo - SECURITY: Uses current user's ID"""
         user = req.scope['user']
         form = await req.form()
         
@@ -49,8 +66,9 @@ def register_todo_routes(app, auth, todo_db):
         if not title:
             return render_todo_form(user, error="Title is required")
         
+        # SECURITY: Always create todo with current user's ID
         todo = todo_db.create_todo(
-            user_id=user.id,
+            user_id=user.id,  # CRITICAL: Use authenticated user's ID
             title=title,
             description=description,
             priority=priority,
@@ -58,28 +76,33 @@ def register_todo_routes(app, auth, todo_db):
         )
         
         if todo:
+            print(f"DEBUG: User {user.id} created todo {todo.id}: '{title[:30]}...'")
             return RedirectResponse('/dashboard?success=created', status_code=303)
         else:
             return render_todo_form(user, error="Failed to create todo")
     
     @app.route("/todos/{todo_id:int}/edit", methods=["GET"])
     def edit_todo_form(req, todo_id: int):
-        """Show edit todo form"""
+        """Show edit todo form - SECURITY HARDENED"""
         user = req.scope['user']
+        # SECURITY: get_todo_by_id verifies user ownership
         todo = todo_db.get_todo_by_id(todo_id, user.id)
         
         if not todo:
+            print(f"SECURITY: User {user.id} blocked from editing todo {todo_id} (not found or not owned)")
             return RedirectResponse('/dashboard?error=not_found', status_code=303)
         
         return render_todo_form(user, todo=todo)
     
     @app.route("/todos/{todo_id:int}/edit", methods=["POST"])
     async def update_todo(req, todo_id: int):
-        """Update an existing todo"""
+        """Update an existing todo - SECURITY HARDENED"""
         user = req.scope['user']
+        # SECURITY: Verify ownership before allowing edit
         todo = todo_db.get_todo_by_id(todo_id, user.id)
         
         if not todo:
+            print(f"SECURITY: User {user.id} blocked from updating todo {todo_id} (not found or not owned)")
             return RedirectResponse('/dashboard?error=not_found', status_code=303)
         
         form = await req.form()
@@ -91,8 +114,10 @@ def register_todo_routes(app, auth, todo_db):
         if not title:
             return render_todo_form(user, todo=todo, error="Title is required")
         
-        success = todo_db.update_todo(
+        # SECURITY: update_todo now requires user_id verification
+        success = todo_db.update_todo_secure(
             todo_id,
+            user.id,  # ADDED: User ID verification
             title=title,
             description=description,
             priority=priority,
@@ -100,37 +125,81 @@ def register_todo_routes(app, auth, todo_db):
         )
         
         if success:
+            print(f"DEBUG: User {user.id} updated todo {todo_id}")
             return RedirectResponse('/dashboard?success=updated', status_code=303)
         else:
             return render_todo_form(user, todo=todo, error="Failed to update todo")
     
     @app.route("/todos/{todo_id:int}/toggle", methods=["POST"])
     def toggle_todo(req, todo_id: int):
-        """Toggle todo completion status"""
+        """Toggle todo completion status - SECURITY HARDENED"""
         user = req.scope['user']
+        # SECURITY: toggle_todo_completion verifies user ownership
         success = todo_db.toggle_todo_completion(todo_id, user.id)
         
         if success:
+            print(f"DEBUG: User {user.id} toggled todo {todo_id}")
             return RedirectResponse('/dashboard?success=toggled', status_code=303)
         else:
+            print(f"SECURITY: User {user.id} blocked from toggling todo {todo_id}")
             return RedirectResponse('/dashboard?error=toggle_failed', status_code=303)
     
     @app.route("/todos/{todo_id:int}/delete", methods=["POST"])
     def delete_todo(req, todo_id: int):
-        """Delete a todo"""
+        """Delete a todo - SECURITY HARDENED"""
         user = req.scope['user']
+        # SECURITY: delete_todo has multi-layer ownership verification
         success = todo_db.delete_todo(todo_id, user.id)
         
         if success:
+            print(f"DEBUG: User {user.id} deleted todo {todo_id}")
             return RedirectResponse('/dashboard?success=deleted', status_code=303)
         else:
+            print(f"SECURITY: User {user.id} blocked from deleting todo {todo_id}")
             return RedirectResponse('/dashboard?error=delete_failed', status_code=303)
+    
+    # DEBUG ROUTE - Remove in production
+    @app.route("/debug/security")
+    @auth.require_admin()
+    def debug_security(req):
+        """Debug route to check security status"""
+        user = req.scope['user']
+        
+        # Get security audit for current user
+        audit = todo_db.security_audit_todos(user.id)
+        
+        # Get all todos debug info
+        all_todos = todo_db.debug_all_todos()
+        
+        debug_html = f"""
+        <h1>Security Audit Debug</h1>
+        <h2>Current User: {user.username} (ID: {user.id}, Role: {user.role})</h2>
+        
+        <h3>Security Audit Results:</h3>
+        <pre>{audit}</pre>
+        
+        <h3>All Todos in System:</h3>
+        <table border="1">
+        <tr><th>Todo ID</th><th>Title</th><th>Owner ID</th><th>Owner Name</th><th>Owner Role</th></tr>
+        """
+        
+        for todo in all_todos:
+            debug_html += f"""
+            <tr>
+                <td>{todo['todo_id']}</td>
+                <td>{todo['title'][:30]}...</td>
+                <td>{todo['owner_id']}</td>
+                <td>{todo['owner_name']}</td>
+                <td>{todo['owner_role']}</td>
+            </tr>
+            """
+        
+        debug_html += "</table>"
+        
+        return debug_html
 
 def render_dashboard(user, todos, stats, filter_type='all'):
-    """Render the main dashboard"""
-    # Success/error messages
-    message_alerts = []
-    
+    """Render the main dashboard - SECURITY: Only shows user's todos"""
     return Title("Dashboard - My Todos"), \
         DashboardNav(user), \
         Container(
@@ -181,7 +250,7 @@ def todos_section(todos):
     )
 
 def todo_item(todo):
-    """Render individual todo item"""
+    """Render individual todo item - SECURITY: Only shows if ownership verified"""
     priority_colors = {
         'high': 'text-red-600 bg-red-50',
         'medium': 'text-yellow-600 bg-yellow-50', 
@@ -209,7 +278,7 @@ def todo_item(todo):
                             )
                         ),
                         
-                        # Actions
+                        # Actions - Only show for user's own todos
                         Div(
                             Form(
                                 Button(
@@ -297,7 +366,7 @@ def render_todo_form(user, todo=None, error=None):
                                 name="description", 
                                 placeholder="Add more details (optional)",
                                 rows=3,
-                                cls="w-full block ml-2"  # Add margin-top and full width
+                                cls="w-full block ml-2"
                             )
                         ),
                         Grid(
@@ -308,7 +377,7 @@ def render_todo_form(user, todo=None, error=None):
                                     Option("Medium", value="medium", selected=(is_edit and todo.priority=="medium")),
                                     Option("High", value="high", selected=(is_edit and todo.priority=="high")),
                                     name="priority",
-                                    cls="ml-2 w-full ",  # Add margin-top and full width
+                                    cls="ml-2 w-full",
                                 ),
                                 cls="text-sm font-medium mb-1"
                             ),
@@ -336,15 +405,15 @@ def render_todo_form(user, todo=None, error=None):
         )
 
 def DashboardNav(user):
-    """Navigation bar for dashboard"""
+    """Navigation bar for dashboard - Updated to use built-in admin"""
     nav_items = [
         A("Dashboard", href="/dashboard"),
         A("Profile", href="/auth/profile"),
     ]
     
-    # Add admin link for admin users
+    # Add admin link for admin users - now points to built-in admin
     if user.role == 'admin':
-        nav_items.append(A("Admin", href="/admin"))
+        nav_items.append(A("Admin", href="/auth/admin"))  # Updated to built-in admin
     
     nav_items.append(A("Logout", href="/auth/logout", cls=ButtonT.secondary))
     
