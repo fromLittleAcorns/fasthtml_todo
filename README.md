@@ -1,6 +1,6 @@
 # FastHTML Todo App - Built-in Admin Integration Example
 
-A comprehensive todo application demonstrating **fasthtml-auth v0.2.0** integration with built-in admin interface, advanced user management, and role-based access control.
+This app is intendeded to demonstrate the use of the fasthtml-auth library to enable fast and easy setup of databases, user management and administration, and middleware for fasthtml based apps.  For more details of fasthtml see [fastHTML](https://www.fastht.ml/docs).
 
 ![FastHTML Todo Demo](https://via.placeholder.com/800x400/2563eb/ffffff?text=FastHTML+Todo+Demo+v2.0)
 
